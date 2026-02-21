@@ -3,15 +3,9 @@ set -euo pipefail
 
 # -----------------------------------------------------------------------------
 # Debian 12 bootstrap script
-# Installs:
-#   zsh, zsh-autosuggestions, zsh-syntax-highlighting
-#   eza, zoxide, neovim, btop
-#   fzf, iperf3, wget
-#   Docker (official repo)
-# Configures:
-#   ~/.zshrc with aliases, zoxide, fzf, completion menu
 # -----------------------------------------------------------------------------
 
+# Определяем, с sudo или без
 if [ "$(id -u)" -eq 0 ]; then
   SUDO=""
   TARGET_USER="${SUDO_USER:-root}"
@@ -20,7 +14,12 @@ else
   TARGET_USER="${USER}"
 fi
 
-TARGET_HOME="$(eval echo ~"${TARGET_USER}")"
+if [ -z "${TARGET_USER}" ]; then
+  echo "Cannot determine target user" >&2
+  exit 1
+fi
+
+TARGET_HOME="$(eval echo "~${TARGET_USER}")"
 ZSHRC_PATH="${TARGET_HOME}/.zshrc"
 
 echo "Target user: ${TARGET_USER}"
@@ -28,15 +27,18 @@ echo "Home:        ${TARGET_HOME}"
 echo
 
 # -----------------------------------------------------------------------------
-# 1. FULL SYSTEM UPDATE (FIRST STEP)
+# 1. FULL SYSTEM UPDATE
 # -----------------------------------------------------------------------------
 echo "==> Full system upgrade"
 ${SUDO} apt-get update -y
 ${SUDO} apt-get full-upgrade -y
 ${SUDO} apt-get autoremove -y
 
+# На всякий случай удаляем neovim и fzf из репозитория Debian
+${SUDO} apt-get remove -y neovim neovim-runtime fzf 2>/dev/null || true
+
 # -----------------------------------------------------------------------------
-# 2. Install base packages from Debian repo
+# 2. Install base packages (без neovim и fzf)
 # -----------------------------------------------------------------------------
 echo "==> Installing base packages"
 
@@ -44,19 +46,41 @@ ${SUDO} apt-get install -y \
   zsh \
   zsh-autosuggestions \
   zsh-syntax-highlighting \
-  neovim \
   btop \
   zoxide \
-  fzf \
   iperf3 \
   wget \
-  ca-certificates \
   curl \
+  ca-certificates \
   gnupg \
-  lsb-release
+  lsb-release \
+  tar \
+  git
 
 # -----------------------------------------------------------------------------
-# 3. Install eza (official repo)
+# 3. Install Neovim from official release tar.gz
+# -----------------------------------------------------------------------------
+echo "==> Installing Neovim (latest release from GitHub)"
+
+NVIM_URL="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz"
+TMP_DIR="$(mktemp -d)"
+
+curl -L "${NVIM_URL}" -o "${TMP_DIR}/nvim.tar.gz"
+
+${SUDO} rm -rf /opt/nvim
+${SUDO} mkdir -p /opt
+
+${SUDO} tar -C /opt -xzf "${TMP_DIR}/nvim.tar.gz"
+${SUDO} mv /opt/nvim-linux-x86_64 /opt/nvim
+
+${SUDO} ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
+
+rm -rf "${TMP_DIR}"
+
+echo "Neovim installed to /opt/nvim"
+
+# -----------------------------------------------------------------------------
+# 4. Install eza (через отдельный репозиторий)
 # -----------------------------------------------------------------------------
 echo "==> Installing eza"
 
@@ -77,7 +101,7 @@ ${SUDO} apt-get update -y
 ${SUDO} apt-get install -y eza
 
 # -----------------------------------------------------------------------------
-# 4. Install Docker (official repository)
+# 5. Install Docker (official repository)
 # -----------------------------------------------------------------------------
 echo "==> Installing Docker"
 
@@ -114,7 +138,47 @@ if getent group docker >/dev/null 2>&1; then
 fi
 
 # -----------------------------------------------------------------------------
-# 5. Configure ~/.zshrc
+# 6. Install fzf from GitHub (per-user, в $HOME/.fzf)
+# -----------------------------------------------------------------------------
+echo "==> Installing fzf from GitHub"
+
+install_fzf_for_user() {
+  if [ ! -d "\$HOME/.fzf" ]; then
+    git clone --depth 1 https://github.com/junegunn/fzf.git "\$HOME/.fzf"
+  else
+    cd "\$HOME/.fzf" && git pull --ff-only || true
+  fi
+
+  "\$HOME/.fzf/install" --key-bindings --completion --no-bash --no-fish --no-update-rc
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+  su - "${TARGET_USER}" -c "$(declare -f install_fzf_for_user); install_fzf_for_user"
+else
+  install_fzf_for_user
+fi
+
+# -----------------------------------------------------------------------------
+# 7. Install powerlevel10k (GitHub, per-user)
+# -----------------------------------------------------------------------------
+echo "==> Installing powerlevel10k"
+
+install_p10k_for_user() {
+  if [ ! -d "\$HOME/.powerlevel10k" ]; then
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "\$HOME/.powerlevel10k"
+  else
+    cd "\$HOME/.powerlevel10k" && git pull --ff-only || true
+  fi
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+  su - "${TARGET_USER}" -c "$(declare -f install_p10k_for_user); install_p10k_for_user"
+else
+  install_p10k_for_user
+fi
+
+# -----------------------------------------------------------------------------
+# 8. Configure .zshrc
 # -----------------------------------------------------------------------------
 echo "==> Configuring .zshrc"
 
@@ -123,7 +187,19 @@ if [ -f "${ZSHRC_PATH}" ]; then
 fi
 
 ${SUDO} tee "${ZSHRC_PATH}" >/dev/null <<'EOF'
+# ---------------------------------------------------------------------
+# Powerlevel10k theme
+# ---------------------------------------------------------------------
+if [ -d "$HOME/.powerlevel10k" ]; then
+  source "$HOME/.powerlevel10k/powerlevel10k.zsh-theme"
+fi
+
+# Load p10k config if it exists
+[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+
+# ---------------------------------------------------------------------
 # Preferred editor
+# ---------------------------------------------------------------------
 export EDITOR="nvim"
 export VISUAL="nvim"
 
@@ -144,10 +220,10 @@ if command -v zoxide >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------
-# fzf key bindings and fuzzy completion
+# fzf (GitHub install, ~/.fzf.zsh)
 # ---------------------------------------------------------------------
-if command -v fzf >/dev/null 2>&1; then
-  source <(fzf --zsh)
+if [ -f "$HOME/.fzf.zsh" ]; then
+  source "$HOME/.fzf.zsh"
 fi
 
 # ---------------------------------------------------------------------
@@ -173,12 +249,13 @@ EOF
 ${SUDO} chown "${TARGET_USER}:${TARGET_USER}" "${ZSHRC_PATH}"
 
 # -----------------------------------------------------------------------------
-# 6. Set default shell to zsh
+# 9. Set default shell to zsh
 # -----------------------------------------------------------------------------
 if command -v zsh >/dev/null 2>&1; then
+  echo "==> Setting default shell to zsh for ${TARGET_USER}"
   ${SUDO} chsh -s "$(command -v zsh)" "${TARGET_USER}" || true
 fi
 
 echo
 echo "Bootstrap completed."
-echo "Re-login required for zsh and docker group to apply."
+echo "Re-login required for zsh, fzf, powerlevel10k and docker group to apply."
