@@ -199,10 +199,23 @@ fi
 export EDITOR="nvim"
 export VISUAL="nvim"
 
+alias nv="nvim"
 alias ls="eza --tree -L 1 --icons=always"
 alias la="eza --icons=always -la"
 alias ldt="eza --icons=always --tree -L 3 --only-dirs"
 alias rmd="rm -ri"
+
+mkcd() {
+    mkdir -p "$1" && cd "$1"
+}
+
+HISTFILE=$HOME/.zhistory
+SAVEHIST=1000
+HISTSIZE=999
+setopt share_history
+setopt hist_expire_dups_first
+setopt hist_ignore_dups
+setopt hist_verify
 
 if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
