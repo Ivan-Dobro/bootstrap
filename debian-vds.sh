@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+export DEBIAN_FRONTEND=noninteractive
+
 # -----------------------------------------------------------------------------
-# Debian 12 bootstrap script
+# Debian bootstrap script
 # -----------------------------------------------------------------------------
 
 if [ "$(id -u)" -eq 0 ]; then
@@ -50,6 +52,8 @@ ${SUDO} apt-get remove -y neovim neovim-runtime fzf 2>/dev/null || true
 # 2. Install base packages
 # -----------------------------------------------------------------------------
 echo "==> Installing base packages"
+
+echo "iperf3 iperf3/start_daemon boolean false" | ${SUDO} debconf-set-selections
 
 ${SUDO} apt-get install -y \
   zsh \
