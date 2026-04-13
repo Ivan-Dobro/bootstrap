@@ -3,6 +3,8 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # -----------------------------------------------------------------------------
 # Debian bootstrap script
 # -----------------------------------------------------------------------------
@@ -22,6 +24,9 @@ fi
 
 TARGET_HOME="$(eval echo "~${TARGET_USER}")"
 ZSHRC_PATH="${TARGET_HOME}/.zshrc"
+NVIM_CONFIG_DIR="${TARGET_HOME}/.config/nvim"
+NVIM_INIT_PATH="${NVIM_CONFIG_DIR}/init.lua"
+NVIM_TEMPLATE_PATH="${SCRIPT_DIR}/init.lua"
 
 echo "Target user: ${TARGET_USER}"
 echo "Home:        ${TARGET_HOME}"
@@ -90,7 +95,23 @@ ${SUDO} ln -sf /opt/nvim/bin/nvim /usr/local/bin/nvim
 rm -rf "${TMP_DIR}"
 
 # -----------------------------------------------------------------------------
-# 4. Install eza
+# 4. Configure Neovim
+# -----------------------------------------------------------------------------
+echo "==> Configuring Neovim"
+
+${SUDO} mkdir -p "${NVIM_CONFIG_DIR}"
+
+if [ ! -f "${NVIM_TEMPLATE_PATH}" ]; then
+  echo "Neovim template not found: ${NVIM_TEMPLATE_PATH}" >&2
+  exit 1
+fi
+
+${SUDO} install -m 0644 "${NVIM_TEMPLATE_PATH}" "${NVIM_INIT_PATH}"
+
+${SUDO} chown -R "${TARGET_USER}:${TARGET_USER}" "${TARGET_HOME}/.config"
+
+# -----------------------------------------------------------------------------
+# 5. Install eza
 # -----------------------------------------------------------------------------
 echo "==> Installing eza"
 
@@ -111,7 +132,7 @@ ${SUDO} apt-get update -y
 ${SUDO} apt-get install -y eza
 
 # -----------------------------------------------------------------------------
-# 5. Install Docker
+# 6. Install Docker
 # -----------------------------------------------------------------------------
 echo "==> Installing Docker"
 
@@ -143,7 +164,7 @@ if getent group docker >/dev/null 2>&1; then
 fi
 
 # -----------------------------------------------------------------------------
-# 6. Install fzf (GitHub)
+# 7. Install fzf (GitHub)
 # -----------------------------------------------------------------------------
 echo "==> Installing fzf"
 
@@ -163,7 +184,7 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 7. Install powerlevel10k
+# 8. Install powerlevel10k
 # -----------------------------------------------------------------------------
 echo "==> Installing powerlevel10k"
 
@@ -182,7 +203,7 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 8. Configure .zshrc
+# 9. Configure .zshrc
 # -----------------------------------------------------------------------------
 echo "==> Configuring .zshrc"
 
@@ -243,7 +264,7 @@ EOF
 ${SUDO} chown "${TARGET_USER}:${TARGET_USER}" "${ZSHRC_PATH}"
 
 # -----------------------------------------------------------------------------
-# 9. Set default shell
+# 10. Set default shell
 # -----------------------------------------------------------------------------
 if command -v zsh >/dev/null 2>&1; then
   ${SUDO} chsh -s "$(command -v zsh)" "${TARGET_USER}" || true
