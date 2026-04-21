@@ -55,6 +55,10 @@ vim.opt.autoread = true
 vim.keymap.set("v", "<Tab>", ">gv")
 vim.keymap.set("v", "<S-Tab>", "<gv")
 
+-- Buffers
+vim.keymap.set("n", "<C-Right>", ":bnext<CR>")
+vim.keymap.set("n", "<C-Left>", ":bprevious<CR>")
+
 -- Windows: move between splits with Ctrl+h/j/k/l.
 vim.keymap.set("n", "<C-h>", "<C-w>h")
 vim.keymap.set("n", "<C-l>", "<C-w>l")
