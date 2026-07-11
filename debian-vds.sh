@@ -24,9 +24,19 @@ fi
 
 TARGET_HOME="$(eval echo "~${TARGET_USER}")"
 ZSHRC_PATH="${TARGET_HOME}/.zshrc"
+P10K_PATH="${TARGET_HOME}/.p10k.zsh"
 NVIM_CONFIG_DIR="${TARGET_HOME}/.config/nvim"
 NVIM_INIT_PATH="${NVIM_CONFIG_DIR}/init.lua"
 NVIM_TEMPLATE_PATH="${SCRIPT_DIR}/init.lua"
+ZSHRC_TEMPLATE_PATH="${SCRIPT_DIR}/.zshrc"
+P10K_TEMPLATE_PATH="${SCRIPT_DIR}/.p10k.zsh"
+
+for template in "${NVIM_TEMPLATE_PATH}" "${ZSHRC_TEMPLATE_PATH}" "${P10K_TEMPLATE_PATH}"; do
+  if [ ! -f "${template}" ]; then
+    echo "Configuration template not found: ${template}" >&2
+    exit 1
+  fi
+done
 
 echo "Target user: ${TARGET_USER}"
 echo "Home:        ${TARGET_HOME}"
@@ -100,11 +110,6 @@ rm -rf "${TMP_DIR}"
 echo "==> Configuring Neovim"
 
 ${SUDO} mkdir -p "${NVIM_CONFIG_DIR}"
-
-if [ ! -f "${NVIM_TEMPLATE_PATH}" ]; then
-  echo "Neovim template not found: ${NVIM_TEMPLATE_PATH}" >&2
-  exit 1
-fi
 
 ${SUDO} install -m 0644 "${NVIM_TEMPLATE_PATH}" "${NVIM_INIT_PATH}"
 
@@ -203,65 +208,23 @@ else
 fi
 
 # -----------------------------------------------------------------------------
-# 9. Configure .zshrc
+# 9. Install Zsh configuration
 # -----------------------------------------------------------------------------
-echo "==> Configuring .zshrc"
+echo "==> Installing Zsh configuration"
 
 if [ -f "${ZSHRC_PATH}" ]; then
   ${SUDO} cp -a "${ZSHRC_PATH}" "${ZSHRC_PATH}.bak"
 fi
 
-${SUDO} tee "${ZSHRC_PATH}" >/dev/null <<'EOF'
-if [ -d "$HOME/.powerlevel10k" ]; then
-  source "$HOME/.powerlevel10k/powerlevel10k.zsh-theme"
-fi
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-
-export EDITOR="nvim"
-export VISUAL="nvim"
-
-alias nv="nvim"
-alias ls="eza --tree -L 1 --icons=always"
-alias la="eza --icons=always -la"
-alias ldt="eza --icons=always --tree -L 3 --only-dirs"
-alias rmd="rm -ri"
-
-mkcd() {
-    mkdir -p "$1" && cd "$1"
-}
-
-HISTFILE=$HOME/.zhistory
-SAVEHIST=1000
-HISTSIZE=999
-setopt share_history
-setopt hist_expire_dups_first
-setopt hist_ignore_dups
-setopt hist_verify
-
-if command -v zoxide >/dev/null 2>&1; then
-  eval "$(zoxide init zsh)"
-  alias cd="z"
+if [ -f "${P10K_PATH}" ]; then
+  ${SUDO} cp -a "${P10K_PATH}" "${P10K_PATH}.bak"
 fi
 
-if [ -f "$HOME/.fzf.zsh" ]; then
-  source "$HOME/.fzf.zsh"
-fi
-
-if [ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]; then
-  source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-fi
-
-if [ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]; then
-  source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-fi
-
-autoload -Uz compinit
-compinit
-setopt AUTO_MENU
-zstyle ':completion:*' menu select
-EOF
-
-${SUDO} chown "${TARGET_USER}:${TARGET_USER}" "${ZSHRC_PATH}"
+TARGET_GROUP="$(id -gn "${TARGET_USER}")"
+${SUDO} install -o "${TARGET_USER}" -g "${TARGET_GROUP}" -m 0644 \
+  "${ZSHRC_TEMPLATE_PATH}" "${ZSHRC_PATH}"
+${SUDO} install -o "${TARGET_USER}" -g "${TARGET_GROUP}" -m 0644 \
+  "${P10K_TEMPLATE_PATH}" "${P10K_PATH}"
 
 # -----------------------------------------------------------------------------
 # 10. Set default shell
