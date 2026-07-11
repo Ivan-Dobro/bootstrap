@@ -1,8 +1,20 @@
--- Clipboard: allow copying over SSH in terminals that support OSC52.
-vim.g.clipboard = "osc52"
+-- Keep paste on Neovim's internal registers. Reading the terminal clipboard
+-- through OSC52 is often unsupported over SSH and makes `p` wait for a reply.
+vim.opt.clipboard = ""
 
--- Clipboard: use the system clipboard by default for yank/delete/paste.
-vim.opt.clipboard = "unnamedplus"
+-- Send every regular yank to the local terminal clipboard through OSC52.
+-- This gives us one-way clipboard integration: `y` copies locally, while `p`
+-- remains instant and pastes from Neovim's internal register.
+vim.api.nvim_create_autocmd("TextYankPost", {
+  callback = function()
+    if vim.v.event.operator == "y" then
+      require("vim.ui.clipboard.osc52").copy("+")(
+        vim.v.event.regcontents,
+        vim.v.event.regtype
+      )
+    end
+  end,
+})
 
 -- Line numbers: show the current absolute line number.
 vim.opt.number = true
