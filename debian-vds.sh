@@ -30,8 +30,13 @@ NVIM_INIT_PATH="${NVIM_CONFIG_DIR}/init.lua"
 NVIM_TEMPLATE_PATH="${SCRIPT_DIR}/init.lua"
 ZSHRC_TEMPLATE_PATH="${SCRIPT_DIR}/.zshrc"
 P10K_TEMPLATE_PATH="${SCRIPT_DIR}/.p10k.zsh"
+WEEKLY_UPDATES_TEMPLATE_PATH="${SCRIPT_DIR}/weekly-updates.sh"
 
-for template in "${NVIM_TEMPLATE_PATH}" "${ZSHRC_TEMPLATE_PATH}" "${P10K_TEMPLATE_PATH}"; do
+for template in \
+  "${NVIM_TEMPLATE_PATH}" \
+  "${ZSHRC_TEMPLATE_PATH}" \
+  "${P10K_TEMPLATE_PATH}" \
+  "${WEEKLY_UPDATES_TEMPLATE_PATH}"; do
   if [ ! -f "${template}" ]; then
     echo "Configuration template not found: ${template}" >&2
     exit 1
@@ -83,7 +88,8 @@ ${SUDO} apt-get install -y \
   gnupg \
   lsb-release \
   tar \
-  git
+  git \
+  cron
 
 # -----------------------------------------------------------------------------
 # 3. Install Neovim (GitHub latest)
@@ -232,6 +238,25 @@ ${SUDO} install -o "${TARGET_USER}" -g "${TARGET_GROUP}" -m 0644 \
 if command -v zsh >/dev/null 2>&1; then
   ${SUDO} chsh -s "$(command -v zsh)" "${TARGET_USER}" || true
 fi
+
+# -----------------------------------------------------------------------------
+# 11. Schedule weekly system updates
+# -----------------------------------------------------------------------------
+echo "==> Scheduling weekly system updates"
+
+${SUDO} install -m 0750 \
+  "${WEEKLY_UPDATES_TEMPLATE_PATH}" /usr/local/sbin/bootstrap-weekly-updates
+${SUDO} touch /var/log/bootstrap-weekly-updates.log
+${SUDO} chmod 0640 /var/log/bootstrap-weekly-updates.log
+
+printf '%s\n' \
+  'SHELL=/bin/bash' \
+  'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
+  '0 5 * * 3 root /usr/local/sbin/bootstrap-weekly-updates' \
+  | ${SUDO} tee /etc/cron.d/bootstrap-weekly-updates >/dev/null
+${SUDO} chmod 0644 /etc/cron.d/bootstrap-weekly-updates
+
+${SUDO} systemctl enable --now cron
 
 echo
 echo "Bootstrap completed."

@@ -14,8 +14,8 @@ export EDITOR="nvim"
 export VISUAL="nvim"
 
 alias nv="nvim"
-alias ls="eza --tree -L 1 --icons=always"
-alias la="eza --icons=always -la"
+alias ls="eza --tree -L 1 --icons=always --group-directories-first"
+alias la="eza --tree -L 1 --icons=always --group-directories-first -la"
 alias ldt="eza --icons=always --tree -L 3 --only-dirs"
 alias rmd="rm -ri"
 
